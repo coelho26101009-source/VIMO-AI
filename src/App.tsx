@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ChevronDown, Terminal as TerminalIcon } from 'lucide-react';
+import { ChevronDown, Menu } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 import { useAuth } from './hooks/useAuth';
@@ -9,7 +9,6 @@ import { useSpeech } from './hooks/useSpeech';
 import { LoginScreen } from './components/LoginScreen';
 import { Sidebar } from './components/Sidebar';
 import { VimoAvatar } from './components/VimoAvatar';
-import { Terminal } from './components/Terminal';
 import { InputBar } from './components/InputBar';
 import type { Attachment } from './types';
 
@@ -56,15 +55,15 @@ const VimoSphere: React.FC<{ isConnected: boolean; isSpeaking: boolean }> = ({
           );
         })}
 
-        {/* Central glow */}
+        {/* Central glow - Sem o pulse para um look mais orgânico */}
         <div
-          className="absolute rounded-full"
+          className="absolute rounded-full transition-all duration-300"
           style={{
-            width: 40, height: 40,
+            width: isSpeaking ? 50 : 40, 
+            height: isSpeaking ? 50 : 40,
             left: '50%', top: '50%',
             transform: 'translate(-50%,-50%)',
             background: 'radial-gradient(circle, rgba(168,85,247,0.6) 0%, transparent 70%)',
-            animation: isSpeaking ? 'vimo-pulse 0.8s ease-in-out infinite' : 'none',
           }}
         />
       </div>
@@ -86,11 +85,15 @@ const App: React.FC = () => {
   const { user, authMode, login, logout, continueAsGuest } = useAuth();
   const { isSpeaking, isListening, speak, toggleMic } = useSpeech();
   const [isConnected, setIsConnected] = useState(false);
-  const [showTerminal, setShowTerminal] = useState(false);
+  
+  // Estado do Menu Hamburger
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  
   const [currentTime, setCurrentTime] = useState('--:--:--');
   const [currentDate, setCurrentDate] = useState('--/--');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Sem addLog para evitar erros no Vercel
   const { logs, chatList, currentChatId, isLoading, sendMessage, newChat, loadChat, subscribeToChats } =
     useChat(user, speak);
 
@@ -121,7 +124,7 @@ const App: React.FC = () => {
     return () => clearTimeout(t);
   }, [authMode]);
 
-  // Subscrever chats Firebase
+  // Subscrever chats
   useEffect(() => {
     if (!user) return;
     const unsub = subscribeToChats(user.uid);
@@ -139,7 +142,16 @@ const App: React.FC = () => {
     });
   }, [toggleMic]);
 
-  // ── Loading ──
+  const handleLoadChat = useCallback((id: string) => {
+    loadChat(id);
+    setIsSidebarOpen(false); // Fecha o menu ao escolher conversa
+  }, [loadChat]);
+
+  const handleNewChat = useCallback(() => {
+    newChat();
+    setIsSidebarOpen(false); // Fecha o menu ao criar conversa
+  }, [newChat]);
+
   if (authMode === 'loading') {
     return (
       <div className="flex items-center justify-center h-screen" style={{ background: '#0e0e18' }}>
@@ -153,7 +165,6 @@ const App: React.FC = () => {
     );
   }
 
-  // ── Login ──
   if (authMode !== 'user' && authMode !== 'guest') {
     return <LoginScreen onLogin={login} onGuest={continueAsGuest} />;
   }
@@ -161,62 +172,74 @@ const App: React.FC = () => {
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: '#0b0b1a' }}>
 
-      {/* ── Sidebar ── */}
-      <Sidebar
-        user={user}
-        isGuest={authMode === 'guest'}
-        chatList={chatList}
-        currentChatId={currentChatId}
-        isConnected={isConnected}
-        isSpeaking={isSpeaking}
-        isListening={isListening}
-        onNewChat={newChat}
-        onLoadChat={loadChat}
-        onLogout={logout}
-        onLogin={login}
-        onToggleMic={handleMicToggle}
-      />
+      {/* ── Overlay Mobile ── */}
+      {isSidebarOpen && (
+        <div 
+          className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
 
-      {/* ── Main panel ── */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      {/* ── Sidebar com Deslize ── */}
+      <div className={`
+        fixed md:static inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        md:translate-x-0 flex shrink-0
+      `}>
+        <Sidebar
+          user={user}
+          isGuest={authMode === 'guest'}
+          chatList={chatList}
+          currentChatId={currentChatId}
+          isConnected={isConnected}
+          isSpeaking={isSpeaking}
+          isListening={isListening}
+          onNewChat={handleNewChat}
+          onLoadChat={handleLoadChat}
+          onLogout={logout}
+          onLogin={login}
+          onToggleMic={handleMicToggle}
+        />
+      </div>
 
-        {/* Header */}
+      {/* ── Painel Principal ── */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+
+        {/* Header Limpo */}
         <header
-          className="h-[60px] flex items-center justify-between px-6 shrink-0"
+          className="h-[60px] flex items-center justify-between px-4 sm:px-6 shrink-0"
           style={{
             background: 'rgba(11,11,26,0.8)',
             backdropFilter: 'blur(12px)',
             borderBottom: '1px solid rgba(139,92,246,0.1)',
           }}
         >
-          {/* Model chip */}
-          <div
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs cursor-default select-none"
-            style={{
-              background: 'rgba(124,58,237,0.1)',
-              border: '1px solid rgba(139,92,246,0.2)',
-              color: 'rgba(255,255,255,0.5)',
-            }}
-          >
-            <span
-              className="w-1.5 h-1.5 rounded-full"
+          {/* Esquerda: Hamburger + Vimo Chip */}
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="md:hidden p-2 -ml-2 rounded-xl text-white/50 hover:text-white hover:bg-white/5 transition-colors"
+            >
+              <Menu size={22} />
+            </button>
+
+            <div
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs cursor-default select-none"
               style={{
-                background: '#4ade80',
-                boxShadow: '0 0 6px #4ade80',
-                animation: 'vimo-pulse 2s ease-in-out infinite',
+                background: 'rgba(124,58,237,0.1)',
+                border: '1px solid rgba(139,92,246,0.2)',
+                color: 'rgba(255,255,255,0.5)',
               }}
-            />
-            <span className="font-medium tracking-wide">VIMO V1.0</span>
-            <ChevronDown size={11} style={{ color: 'rgba(255,255,255,0.25)' }} />
+            >
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#4ade80', boxShadow: '0 0 6px #4ade80' }} />
+              <span className="font-medium tracking-wide">VIMO V1.0</span>
+              <ChevronDown size={11} style={{ color: 'rgba(255,255,255,0.25)' }} />
+            </div>
           </div>
 
-          {/* Right cluster */}
+          {/* Direita: Relógio + Perfil (Sem botão do terminal) */}
           <div className="flex items-center gap-3">
-            {/* Clock */}
-            <div
-              className="hidden sm:flex items-center gap-3 px-4 py-2 rounded-xl"
-              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
-            >
+            <div className="hidden sm:flex items-center gap-3 px-4 py-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
               <div className="text-center">
                 <p className="font-mono text-xs font-semibold leading-none" style={{ color: '#a78bfa' }}>{currentTime}</p>
                 <p className="text-[9px] uppercase tracking-wider mt-0.5" style={{ color: 'rgba(255,255,255,0.2)' }}>HORA</p>
@@ -228,21 +251,6 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            {/* Terminal toggle */}
-            <button
-              onClick={() => setShowTerminal(o => !o)}
-              className="hidden md:flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all"
-              style={{
-                background: showTerminal ? 'rgba(124,58,237,0.2)' : 'rgba(255,255,255,0.04)',
-                border: `1px solid ${showTerminal ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.06)'}`,
-                color: showTerminal ? '#c4b5fd' : 'rgba(255,255,255,0.3)',
-              }}
-            >
-              <TerminalIcon size={13} />
-              Terminal
-            </button>
-
-            {/* Avatar user */}
             <div
               className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold overflow-hidden cursor-pointer transition-all"
               style={{
@@ -260,118 +268,52 @@ const App: React.FC = () => {
 
         {/* Content */}
         <div className="flex-1 flex overflow-hidden min-h-0">
-
-          {/* Chat area */}
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-
-            {/* Messages */}
             <div className="flex-1 overflow-y-auto vimo-scroll" style={{ padding: '24px 0' }}>
               {!hasMessages ? (
-                /* ── Welcome ── */
                 <div className="h-full flex flex-col items-center justify-center gap-6 px-6">
                   <VimoSphere isConnected={isConnected} isSpeaking={isSpeaking} />
                   <div className="text-center">
                     <h2 className="text-2xl font-bold text-white mb-1">
-                      Olá, eu sou o{' '}
-                      <span style={{ color: '#a855f7' }}>VIMO.</span>
+                      Olá, eu sou o <span style={{ color: '#a855f7' }}>VIMO.</span>
                     </h2>
-                    <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                      Em que posso ajudar?
-                    </p>
+                    <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>Em que posso ajudar?</p>
                   </div>
                 </div>
               ) : (
-                /* ── Chat messages ── */
-                <div className="max-w-3xl mx-auto w-full px-6 space-y-5">
+                <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 space-y-5">
                   {logs.map(log => {
                     if (log.source === 'SYSTEM') {
-                      return (
-                        <p key={log.id} className="text-center text-xs py-1"
-                          style={{ color: 'rgba(255,255,255,0.18)', fontFamily: 'monospace' }}>
-                          {log.text}
-                        </p>
-                      );
+                      return <p key={log.id} className="text-center text-xs py-1" style={{ color: 'rgba(255,255,255,0.18)', fontFamily: 'monospace' }}>{log.text}</p>;
                     }
-
                     const isUser = log.source === 'USER';
                     const isErr = log.source === 'ERROR';
 
                     return (
-                      <div
-                        key={log.id}
-                        className="flex gap-3 animate-fade-up"
-                        style={{ flexDirection: isUser ? 'row-reverse' : 'row' }}
-                      >
-                        {/* Avatar */}
+                      <div key={log.id} className="flex gap-3 animate-fade-up" style={{ flexDirection: isUser ? 'row-reverse' : 'row' }}>
                         {!isUser && (
                           <div className="shrink-0 mt-1">
                             <VimoAvatar size={36} isConnected={isConnected} isSpeaking={isSpeaking && log === logs[logs.length - 1]} />
                           </div>
                         )}
-
                         {isUser && (
-                          <div
-                            className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold mt-1 overflow-hidden"
-                            style={{
-                              background: 'linear-gradient(135deg,rgba(124,58,237,0.4),rgba(99,102,241,0.4))',
-                              border: '1px solid rgba(139,92,246,0.4)',
-                              color: '#c4b5fd',
-                            }}
-                          >
-                            {user?.photoURL
-                              ? <img src={user.photoURL} alt="" className="w-full h-full object-cover" />
-                              : (user?.displayName?.charAt(0).toUpperCase() || '?')}
+                          <div className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold mt-1 overflow-hidden" style={{ background: 'linear-gradient(135deg,rgba(124,58,237,0.4),rgba(99,102,241,0.4))', border: '1px solid rgba(139,92,246,0.4)', color: '#c4b5fd' }}>
+                            {user?.photoURL ? <img src={user.photoURL} alt="" className="w-full h-full object-cover" /> : (user?.displayName?.charAt(0).toUpperCase() || '?')}
                           </div>
                         )}
-
-                        {/* Bubble */}
-                        <div style={{ maxWidth: '75%', display: 'flex', flexDirection: 'column', alignItems: isUser ? 'flex-end' : 'flex-start', gap: 4 }}>
+                        <div style={{ maxWidth: '85%', display: 'flex', flexDirection: 'column', alignItems: isUser ? 'flex-end' : 'flex-start', gap: 4 }}>
                           <span className="text-[10px] px-1" style={{ color: 'rgba(255,255,255,0.2)', fontFamily: 'monospace' }}>
-                            {log.timestamp}
-                            {!isUser && <span style={{ color: '#7c3aed' }}> · Vimo</span>}
-                            {isUser && log.source === 'USER' && (
-                              <span style={{ color: 'rgba(99,102,241,0.6)', marginLeft: 4 }}>✓✓</span>
-                            )}
+                            {log.timestamp} {!isUser && <span style={{ color: '#7c3aed' }}> · Vimo</span>} {isUser && log.source === 'USER' && <span style={{ color: 'rgba(99,102,241,0.6)', marginLeft: 4 }}>✓✓</span>}
                           </span>
-
-                          <div
-                            className="px-4 py-3 text-sm leading-relaxed"
-                            style={{
-                              borderRadius: isUser ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-                              background: isUser
-                                ? 'linear-gradient(135deg, rgba(99,102,241,0.25), rgba(124,58,237,0.2))'
-                                : isErr
-                                  ? 'rgba(239,68,68,0.08)'
-                                  : 'rgba(255,255,255,0.05)',
-                              border: isUser
-                                ? '1px solid rgba(139,92,246,0.3)'
-                                : isErr
-                                  ? '1px solid rgba(239,68,68,0.2)'
-                                  : '1px solid rgba(255,255,255,0.08)',
-                              color: isErr ? '#fca5a5' : '#e2e0f0',
-                              backdropFilter: 'blur(8px)',
-                            }}
-                          >
-                            {isUser ? (
-                              <span style={{ color: 'white' }}>{log.text}</span>
-                            ) : (
+                          <div className="px-4 py-3 text-sm leading-relaxed" style={{ borderRadius: isUser ? '18px 18px 4px 18px' : '18px 18px 18px 4px', background: isUser ? 'linear-gradient(135deg, rgba(99,102,241,0.25), rgba(124,58,237,0.2))' : isErr ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.05)', border: isUser ? '1px solid rgba(139,92,246,0.3)' : isErr ? '1px solid rgba(239,68,68,0.2)' : '1px solid rgba(255,255,255,0.08)', color: isErr ? '#fca5a5' : '#e2e0f0', backdropFilter: 'blur(8px)' }}>
+                            {isUser ? <span style={{ color: 'white' }}>{log.text}</span> : (
                               <ReactMarkdown
                                 components={{
                                   p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
                                   strong: ({ children }) => <strong style={{ color: '#c4b5fd', fontWeight: 600 }}>{children}</strong>,
                                   code: ({ children, className }) => {
                                     const isBlock = className?.includes('language-');
-                                    return isBlock ? (
-                                      <pre className="my-2 p-3 rounded-xl overflow-x-auto text-xs"
-                                        style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(139,92,246,0.2)', color: '#a78bfa' }}>
-                                        <code>{children}</code>
-                                      </pre>
-                                    ) : (
-                                      <code className="px-1.5 py-0.5 rounded text-xs"
-                                        style={{ background: 'rgba(124,58,237,0.15)', color: '#c4b5fd', border: '1px solid rgba(139,92,246,0.2)' }}>
-                                        {children}
-                                      </code>
-                                    );
+                                    return isBlock ? <pre className="my-2 p-3 rounded-xl overflow-x-auto text-xs" style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(139,92,246,0.2)', color: '#a78bfa' }}><code>{children}</code></pre> : <code className="px-1.5 py-0.5 rounded text-xs" style={{ background: 'rgba(124,58,237,0.15)', color: '#c4b5fd', border: '1px solid rgba(139,92,246,0.2)' }}>{children}</code>;
                                   },
                                   ul: ({ children }) => <ul className="list-disc pl-4 space-y-1 mb-2">{children}</ul>,
                                   ol: ({ children }) => <ol className="list-decimal pl-4 space-y-1 mb-2">{children}</ol>,
@@ -389,81 +331,29 @@ const App: React.FC = () => {
                       </div>
                     );
                   })}
-
-                  {/* Typing indicator */}
                   {isLoading && (
                     <div className="flex gap-3 animate-fade-up">
                       <VimoAvatar size={36} isConnected={isConnected} isSpeaking />
-                      <div
-                        className="flex items-center gap-2 px-5 py-4 rounded-[18px]"
-                        style={{
-                          background: 'rgba(255,255,255,0.05)',
-                          border: '1px solid rgba(255,255,255,0.08)',
-                        }}
-                      >
-                        {[0, 0.2, 0.4].map((d, i) => (
-                          <span
-                            key={i}
-                            className="w-2 h-2 rounded-full"
-                            style={{
-                              background: '#7c3aed',
-                              animation: `vimo-bounce 1.2s ease-in-out infinite ${d}s`,
-                            }}
-                          />
-                        ))}
+                      <div className="flex items-center gap-2 px-5 py-4 rounded-[18px]" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        {[0, 0.2, 0.4].map((d, i) => <span key={i} className="w-2 h-2 rounded-full" style={{ background: '#7c3aed', animation: `vimo-bounce 1.2s ease-in-out infinite ${d}s` }} />)}
                       </div>
                     </div>
                   )}
-
                   <div ref={messagesEndRef} />
                 </div>
               )}
             </div>
-
-            <InputBar
-              onSend={handleSend}
-              isLoading={isLoading}
-              isConnected={isConnected}
-            />
+            <InputBar onSend={handleSend} isLoading={isLoading} isConnected={isConnected} />
           </div>
-
-          {/* Terminal panel */}
-          {showTerminal && (
-            <div
-              className="hidden md:flex w-[420px] shrink-0 flex-col"
-              style={{ borderLeft: '1px solid rgba(139,92,246,0.1)' }}
-            >
-              <Terminal logs={logs} />
-            </div>
-          )}
         </div>
       </div>
 
       <style>{`
-        @keyframes vimo-orbit {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        @keyframes vimo-orbit-r {
-          from { transform: rotate(360deg); }
-          to { transform: rotate(0deg); }
-        }
-        @keyframes vimo-twinkle {
-          0%, 100% { opacity: var(--op, 0.5); transform: scale(1); }
-          50% { opacity: 1; transform: scale(1.6); }
-        }
-        @keyframes vimo-pulse {
-          0%, 100% { transform: scale(1); opacity: 0.8; }
-          50% { transform: scale(1.3); opacity: 1; }
-        }
-        @keyframes vimo-bounce {
-          0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
-          40% { transform: translateY(-6px); opacity: 1; }
-        }
-        @keyframes fade-up {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
+        @keyframes vimo-orbit { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes vimo-orbit-r { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
+        @keyframes vimo-twinkle { 0%, 100% { opacity: var(--op, 0.5); transform: scale(1); } 50% { opacity: 1; transform: scale(1.6); } }
+        @keyframes vimo-bounce { 0%, 80%, 100% { transform: translateY(0); opacity: 0.4; } 40% { transform: translateY(-6px); opacity: 1; } }
+        @keyframes fade-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade-up { animation: fade-up 0.25s ease forwards; }
         .vimo-scroll { scrollbar-width: thin; scrollbar-color: rgba(124,58,237,0.2) transparent; }
         .vimo-scroll::-webkit-scrollbar { width: 4px; }
