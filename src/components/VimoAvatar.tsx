@@ -1,5 +1,4 @@
-import React, { useRef } from 'react';
-
+import React, { useState, useEffect } from 'react';
 interface VimoAvatarProps {
   size?: number;
   isSpeaking?: boolean;
