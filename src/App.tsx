@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ChevronDown, Menu } from 'lucide-react';
+import { ChevronDown, Menu, User } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 import { useAuth } from './hooks/useAuth';
@@ -158,7 +158,13 @@ const App: React.FC = () => {
               <div><p className="font-mono text-xs text-purple-400 leading-none">{currentDate}</p><p className="text-[9px] text-white/20 mt-0.5">HOJE</p></div>
             </div>
             <div className="w-8 h-8 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-300 text-xs font-bold">
-              {user?.photoURL ? <img src={user.photoURL} className="w-full h-full object-cover rounded-full" /> : (user?.displayName?.charAt(0) || '?')}
+              {user?.photoURL ? (
+                <img src={user.photoURL} className="w-full h-full object-cover rounded-full" />
+              ) : user?.displayName ? (
+                user.displayName.charAt(0)
+              ) : (
+                <User size={16} className="text-purple-200/80" />
+              )}
             </div>
           </div>
         </header>
