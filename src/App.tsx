@@ -55,7 +55,10 @@ const App: React.FC = () => {
   const { user, authMode, login, logout, continueAsGuest } = useAuth();
   const { isSpeaking, isListening, speak, toggleMic } = useSpeech();
   const [isConnected, setIsConnected] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(min-width: 768px)').matches;
+  });
   const [currentTime, setCurrentTime] = useState('--:--:--');
   const [currentDate, setCurrentDate] = useState('--/--');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -85,6 +88,24 @@ const App: React.FC = () => {
   }, [authMode]);
 
   useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)');
+    const apply = () => setIsSidebarOpen(mq.matches);
+    apply();
+    mq.addEventListener('change', apply);
+    return () => mq.removeEventListener('change', apply);
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setIsSidebarOpen(false);
+    };
+    if (!isSidebarOpen) return;
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isSidebarOpen]);
+
+  useEffect(() => {
     if (!user) return;
     const unsub = subscribeToChats(user.uid);
     return () => unsub();
@@ -103,14 +124,27 @@ const App: React.FC = () => {
       {isSidebarOpen && <div className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)} />}
 
       {/* Sidebar Retrátil */}
-      <div className={`fixed md:static inset-y-0 left-0 z-50 transform transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
+      <div
+        className={[
+          'fixed md:relative inset-y-0 left-0 z-50 md:z-auto',
+          'transition-[transform,width] duration-300 ease-out',
+          'w-[280px] md:overflow-hidden',
+          isSidebarOpen ? 'translate-x-0 md:w-[280px] md:pointer-events-auto' : '-translate-x-full md:translate-x-0 md:w-0 md:pointer-events-none',
+        ].join(' ')}
+      >
         <Sidebar user={user} isGuest={authMode === 'guest'} chatList={chatList} currentChatId={currentChatId} isConnected={isConnected} isSpeaking={isSpeaking} isListening={isListening} onNewChat={() => { newChat(); setIsSidebarOpen(false); }} onLoadChat={(id) => { loadChat(id); setIsSidebarOpen(false); }} onLogout={logout} onLogin={login} onToggleMic={() => toggleMic((t) => window.dispatchEvent(new CustomEvent('vimo-transcript', { detail: t })))} />
       </div>
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-[60px] flex items-center justify-between px-4 sm:px-6 bg-[#0b0b1a]/80 backdrop-blur-xl border-b border-white/5">
           <div className="flex items-center gap-3">
-            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="md:hidden p-2 text-white/50"><Menu size={22} /></button>
+            <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-2 text-white/50 hover:text-white/80 transition-colors"
+              aria-label={isSidebarOpen ? 'Fechar menu' : 'Abrir menu'}
+            >
+              <Menu size={22} />
+            </button>
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-white/50 text-xs">
               <span className="w-1.5 h-1.5 rounded-full bg-[#4ade80] shadow-[0_0_6px_#4ade80]" />
               <span className="font-medium">VIMO V1.0</span>
