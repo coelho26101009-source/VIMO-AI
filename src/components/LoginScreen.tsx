@@ -5,9 +5,11 @@ import { VimoAvatar } from './VimoAvatar';
 interface LoginScreenProps {
   onLogin: () => void;
   onGuest: () => void;
+  isAuthBusy?: boolean;
+  authError?: string | null;
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onGuest }) => {
+export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onGuest, isAuthBusy = false, authError = null }) => {
   return (
     <div
       className="flex flex-col items-center justify-center h-screen w-full relative overflow-hidden"
@@ -47,17 +49,27 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onGuest }) =>
         <div className="w-full flex flex-col gap-3">
           <button
             onClick={onLogin}
-            className="w-full flex items-center justify-center gap-3 py-3.5 px-6 rounded-2xl font-semibold text-sm text-white transition-all duration-200"
+            disabled={isAuthBusy}
+            className="w-full flex items-center justify-center gap-3 py-3.5 px-6 rounded-2xl font-semibold text-sm text-white transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
             style={{
               background: 'linear-gradient(135deg, #7c3aed, #6366f1)',
               boxShadow: '0 4px 24px rgba(124,58,237,0.35)',
             }}
-            onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 6px 32px rgba(124,58,237,0.55)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+            onMouseEnter={e => { if (!isAuthBusy) { e.currentTarget.style.boxShadow = '0 6px 32px rgba(124,58,237,0.55)'; e.currentTarget.style.transform = 'translateY(-1px)'; } }}
             onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 4px 24px rgba(124,58,237,0.35)'; e.currentTarget.style.transform = 'translateY(0)'; }}
           >
             <LogIn size={16} />
-            Entrar com Google
+            {isAuthBusy ? 'A abrir login…' : 'Entrar com Google'}
           </button>
+
+          {authError && (
+            <div
+              className="px-4 py-3 rounded-2xl text-xs leading-relaxed"
+              style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)', color: 'rgba(254,226,226,0.9)' }}
+            >
+              {authError}
+            </div>
+          )}
 
           <div className="flex items-center gap-3 my-1">
             <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.06)' }} />
@@ -67,6 +79,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onGuest }) =>
 
           <button
             onClick={onGuest}
+            disabled={isAuthBusy}
             className="w-full flex items-center justify-center gap-3 py-3.5 px-6 rounded-2xl font-medium text-sm transition-all duration-200"
             style={{
               background: 'rgba(255,255,255,0.04)',

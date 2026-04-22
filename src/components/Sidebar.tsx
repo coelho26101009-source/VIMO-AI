@@ -18,12 +18,14 @@ interface SidebarProps {
   onLogin: () => void;
   onToggleMic: () => void;
   onClose?: () => void;
+  isAuthBusy?: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   user, isGuest, chatList, currentChatId,
   isConnected, isSpeaking, isListening,
   onNewChat, onLoadChat, onLogout, onLogin, onToggleMic,
+  isAuthBusy = false,
 }) => {
   return (
     <aside
@@ -115,11 +117,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </p>
             <button
               onClick={onLogin}
-              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-semibold transition-all"
+              disabled={isAuthBusy}
+              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-semibold transition-all disabled:opacity-60 disabled:cursor-not-allowed"
               style={{ background: 'rgba(124,58,237,0.2)', border: '1px solid rgba(139,92,246,0.3)', color: '#c4b5fd' }}
             >
               <LogIn size={13} />
-              Entrar com Google
+              {isAuthBusy ? 'A abrir login…' : 'Entrar com Google'}
             </button>
           </div>
         )}

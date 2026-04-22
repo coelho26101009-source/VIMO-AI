@@ -52,7 +52,7 @@ const VimoSphere: React.FC<{ isConnected: boolean; isSpeaking: boolean }> = ({
 };
 
 const App: React.FC = () => {
-  const { user, authMode, login, logout, continueAsGuest } = useAuth();
+  const { user, authMode, isAuthBusy, authError, login, logout, continueAsGuest } = useAuth();
   const { isSpeaking, isListening, speak, toggleMic } = useSpeech();
   const [isConnected, setIsConnected] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(() => {
@@ -116,7 +116,9 @@ const App: React.FC = () => {
   }, [sendMessage, user]);
 
   if (authMode === 'loading') return <div className="h-screen flex items-center justify-center bg-[#0e0e18] text-white/20 uppercase tracking-widest text-xs">A carregar...</div>;
-  if (authMode !== 'user' && authMode !== 'guest') return <LoginScreen onLogin={login} onGuest={continueAsGuest} />;
+  if (authMode !== 'user' && authMode !== 'guest') {
+    return <LoginScreen onLogin={login} onGuest={continueAsGuest} isAuthBusy={isAuthBusy} authError={authError} />;
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#0b0b1a]">
@@ -132,7 +134,7 @@ const App: React.FC = () => {
           isSidebarOpen ? 'translate-x-0 md:w-[280px] md:pointer-events-auto' : '-translate-x-full md:translate-x-0 md:w-0 md:pointer-events-none',
         ].join(' ')}
       >
-        <Sidebar user={user} isGuest={authMode === 'guest'} chatList={chatList} currentChatId={currentChatId} isConnected={isConnected} isSpeaking={isSpeaking} isListening={isListening} onNewChat={() => { newChat(); setIsSidebarOpen(false); }} onLoadChat={(id) => { loadChat(id); setIsSidebarOpen(false); }} onLogout={logout} onLogin={login} onToggleMic={() => toggleMic((t) => window.dispatchEvent(new CustomEvent('vimo-transcript', { detail: t })))} />
+        <Sidebar user={user} isGuest={authMode === 'guest'} chatList={chatList} currentChatId={currentChatId} isConnected={isConnected} isSpeaking={isSpeaking} isListening={isListening} onNewChat={() => { newChat(); setIsSidebarOpen(false); }} onLoadChat={(id) => { loadChat(id); setIsSidebarOpen(false); }} onLogout={logout} onLogin={login} onToggleMic={() => toggleMic((t) => window.dispatchEvent(new CustomEvent('vimo-transcript', { detail: t })))} isAuthBusy={isAuthBusy} />
       </div>
 
       <div className="flex-1 flex flex-col min-w-0">
