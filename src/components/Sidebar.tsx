@@ -17,6 +17,7 @@ interface SidebarProps {
   onLogout: () => void;
   onLogin: () => void;
   onToggleMic: () => void;
+  onClose?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
