@@ -14,18 +14,21 @@ interface SidebarProps {
   isListening: boolean;
   onNewChat: () => void;
   onLoadChat: (id: string) => void;
+  onDeleteChat?: (id: string) => void;
   onLogout: () => void;
   onLogin: () => void;
   onToggleMic: () => void;
   onClose?: () => void;
   isAuthBusy?: boolean;
+  chatError?: string | null;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   user, isGuest, chatList, currentChatId,
   isConnected, isSpeaking, isListening,
-  onNewChat, onLoadChat, onLogout, onLogin, onToggleMic,
+  onNewChat, onLoadChat, onDeleteChat, onLogout, onLogin, onToggleMic,
   isAuthBusy = false,
+  chatError = null,
 }) => {
   return (
     <aside
@@ -90,11 +93,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* ── Histórico ── */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1 vimo-scroll">
+        {chatError && (
+          <div
+            className="mb-2 p-3 rounded-2xl text-xs leading-relaxed"
+            style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)', color: 'rgba(254,226,226,0.9)' }}
+          >
+            {chatError}
+          </div>
+        )}
+
         {user && chatList.length > 0 && chatList.map(chat => (
           <button
             key={chat.id}
             onClick={() => onLoadChat(chat.id)}
-            className="w-full text-left px-3 py-2.5 rounded-xl text-sm transition-all duration-150"
+            className="group w-full text-left px-3 py-2.5 rounded-xl text-sm transition-all duration-150 flex items-center gap-2"
             style={{
               background: currentChatId === chat.id
                 ? 'linear-gradient(135deg,rgba(124,58,237,0.2),rgba(99,102,241,0.15))'
@@ -105,7 +117,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
               color: currentChatId === chat.id ? '#c4b5fd' : 'rgba(255,255,255,0.4)',
             }}
           >
-            <span className="truncate block">{chat.title}</span>
+            <span className="truncate block flex-1">{chat.title}</span>
+            {onDeleteChat && (
+              <span
+                role="button"
+                title="Apagar conversa"
+                onClick={(e) => { e.stopPropagation(); onDeleteChat(chat.id); }}
+                className="opacity-0 group-hover:opacity-100 transition-opacity text-white/25 hover:text-red-300"
+              >
+                🗑️
+              </span>
+            )}
           </button>
         ))}
 

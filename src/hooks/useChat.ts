@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import type { User } from 'firebase/auth';
 import {
   collection, query, where, orderBy, onSnapshot,
-  addDoc, updateDoc, doc, serverTimestamp, getDoc
+  addDoc, updateDoc, doc, serverTimestamp, getDoc, deleteDoc
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { LogMessage, Chat, Attachment } from '../types';
@@ -16,6 +16,7 @@ export const useChat = (user: User | null, onReply: (text: string) => void) => {
   const [chatList, setChatList] = useState<Chat[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
 
   const makeId = () => Math.random().toString(36).substring(2, 9);
   const makeTimestamp = () => new Date().toLocaleTimeString('pt-PT', { hour12: false });
@@ -32,17 +33,44 @@ export const useChat = (user: User | null, onReply: (text: string) => void) => {
       where('userId', '==', userId),
       orderBy('updatedAt', 'desc')
     );
-    return onSnapshot(q, snapshot => {
-      setChatList(snapshot.docs.map(d => ({ id: d.id, title: d.data().title })));
-    });
+    return onSnapshot(
+      q,
+      snapshot => {
+        setChatError(null);
+        setChatList(snapshot.docs.map(d => ({ id: d.id, title: d.data().title })));
+      },
+      (err) => {
+        console.error('Firestore subscribe error:', err);
+        setChatList([]);
+        if ((err as { code?: string })?.code === 'permission-denied') {
+          setChatError('Sem permissões no Firestore para ler as conversas (permission-denied).');
+          addLog('ERROR', 'Sem permissões para carregar conversas. Verifica as regras do Firestore.');
+        } else {
+          setChatError('Erro ao carregar conversas.');
+          addLog('ERROR', 'Erro ao carregar conversas.');
+        }
+      }
+    );
   }, []);
 
   const loadChat = useCallback(async (id: string) => {
-    setCurrentChatId(id);
-    const chatDoc = await getDoc(doc(db, 'chats', id));
-    if (chatDoc.exists()) {
-      setLogs(chatDoc.data().messages || []);
-      addLog('SYSTEM', 'Histórico carregado.');
+    try {
+      setChatError(null);
+      setCurrentChatId(id);
+      const chatDoc = await getDoc(doc(db, 'chats', id));
+      if (chatDoc.exists()) {
+        setLogs(chatDoc.data().messages || []);
+        addLog('SYSTEM', 'Histórico carregado.');
+      }
+    } catch (err) {
+      console.error('Erro ao carregar chat:', err);
+      if ((err as { code?: string })?.code === 'permission-denied') {
+        setChatError('Sem permissões no Firestore para carregar esta conversa.');
+        addLog('ERROR', 'Sem permissões para carregar esta conversa (Firestore).');
+      } else {
+        setChatError('Erro ao carregar conversa.');
+        addLog('ERROR', 'Erro ao carregar conversa.');
+      }
     }
   }, [addLog]);
 
@@ -50,6 +78,28 @@ export const useChat = (user: User | null, onReply: (text: string) => void) => {
     setCurrentChatId(null);
     setLogs([]);
   }, []);
+
+  const deleteChat = useCallback(async (id: string) => {
+    if (!user) return;
+    try {
+      setChatError(null);
+      await deleteDoc(doc(db, 'chats', id));
+      if (currentChatId === id) {
+        setCurrentChatId(null);
+        setLogs([]);
+      }
+      addLog('SYSTEM', 'Conversa apagada.');
+    } catch (err) {
+      console.error('Erro ao apagar chat:', err);
+      if ((err as { code?: string })?.code === 'permission-denied') {
+        setChatError('Sem permissões no Firestore para apagar conversas.');
+        addLog('ERROR', 'Sem permissões para apagar conversas (Firestore).');
+      } else {
+        setChatError('Erro ao apagar conversa.');
+        addLog('ERROR', 'Erro ao apagar conversa.');
+      }
+    }
+  }, [user, currentChatId, addLog]);
 
   const sendMessage = useCallback(async (
     text: string,
@@ -125,18 +175,34 @@ export const useChat = (user: User | null, onReply: (text: string) => void) => {
 
       if (user) {
         if (!currentChatId) {
-          const docRef = await addDoc(collection(db, 'chats'), {
-            userId: user.uid,
-            title: text.substring(0, 35) || 'Nova Conversa',
-            updatedAt: serverTimestamp(),
-            messages: updatedLogs,
-          });
-          setCurrentChatId(docRef.id);
+          try {
+            const docRef = await addDoc(collection(db, 'chats'), {
+              userId: user.uid,
+              title: text.substring(0, 35) || 'Nova Conversa',
+              updatedAt: serverTimestamp(),
+              messages: updatedLogs,
+            });
+            setCurrentChatId(docRef.id);
+          } catch (err) {
+            console.error('Erro ao criar conversa no Firestore:', err);
+            if ((err as { code?: string })?.code === 'permission-denied') {
+              setChatError('Sem permissões no Firestore para criar conversas.');
+              addLog('ERROR', 'Sem permissões para guardar conversas (Firestore).');
+            }
+          }
         } else {
-          await updateDoc(doc(db, 'chats', currentChatId), {
-            updatedAt: serverTimestamp(),
-            messages: updatedLogs,
-          });
+          try {
+            await updateDoc(doc(db, 'chats', currentChatId), {
+              updatedAt: serverTimestamp(),
+              messages: updatedLogs,
+            });
+          } catch (err) {
+            console.error('Erro ao atualizar conversa no Firestore:', err);
+            if ((err as { code?: string })?.code === 'permission-denied') {
+              setChatError('Sem permissões no Firestore para atualizar conversas.');
+              addLog('ERROR', 'Sem permissões para guardar conversas (Firestore).');
+            }
+          }
         }
       }
     } catch (e: unknown) {
@@ -149,6 +215,7 @@ export const useChat = (user: User | null, onReply: (text: string) => void) => {
 
   return {
     logs, chatList, currentChatId, isLoading,
-    addLog, sendMessage, newChat, loadChat, subscribeToChats,
+    chatError,
+    addLog, sendMessage, newChat, loadChat, deleteChat, subscribeToChats,
   };
 };

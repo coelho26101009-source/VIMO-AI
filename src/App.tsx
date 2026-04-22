@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ChevronDown, Menu } from 'lucide-react';
+import { ChevronDown, Menu, VolumeX, Volume2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 import { useAuth } from './hooks/useAuth';
@@ -53,7 +53,7 @@ const VimoSphere: React.FC<{ isConnected: boolean; isSpeaking: boolean }> = ({
 
 const App: React.FC = () => {
   const { user, authMode, isAuthBusy, authError, login, logout, continueAsGuest } = useAuth();
-  const { isSpeaking, isListening, speak, toggleMic } = useSpeech();
+  const { isSpeaking, isListening, isMuted, speak, toggleMic, toggleMute } = useSpeech();
   const [isConnected, setIsConnected] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
@@ -62,13 +62,31 @@ const App: React.FC = () => {
   const [currentTime, setCurrentTime] = useState('--:--:--');
   const [currentDate, setCurrentDate] = useState('--/--');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  const [isAtBottom, setIsAtBottom] = useState(true);
 
-  const { logs, chatList, currentChatId, isLoading, sendMessage, newChat, loadChat, subscribeToChats } =
+  const { logs, chatList, currentChatId, isLoading, chatError, sendMessage, newChat, loadChat, deleteChat, subscribeToChats } =
     useChat(user, speak);
 
   const hasMessages = logs.filter(l => l.source !== 'SYSTEM').length > 0;
 
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [logs]);
+  useEffect(() => {
+    if (!isAtBottom) return;
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [logs, isAtBottom]);
+
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const thresholdPx = 120;
+      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= thresholdPx;
+      setIsAtBottom(atBottom);
+    };
+    onScroll();
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, []);
 
   useEffect(() => {
     const tick = () => {
@@ -134,7 +152,7 @@ const App: React.FC = () => {
           isSidebarOpen ? 'translate-x-0 md:w-[280px] md:pointer-events-auto' : '-translate-x-full md:translate-x-0 md:w-0 md:pointer-events-none',
         ].join(' ')}
       >
-        <Sidebar user={user} isGuest={authMode === 'guest'} chatList={chatList} currentChatId={currentChatId} isConnected={isConnected} isSpeaking={isSpeaking} isListening={isListening} onNewChat={() => { newChat(); setIsSidebarOpen(false); }} onLoadChat={(id) => { loadChat(id); setIsSidebarOpen(false); }} onLogout={logout} onLogin={login} onToggleMic={() => toggleMic((t) => window.dispatchEvent(new CustomEvent('vimo-transcript', { detail: t })))} isAuthBusy={isAuthBusy} />
+        <Sidebar user={user} isGuest={authMode === 'guest'} chatList={chatList} currentChatId={currentChatId} isConnected={isConnected} isSpeaking={isSpeaking} isListening={isListening} onNewChat={() => { newChat(); setIsSidebarOpen(false); }} onLoadChat={(id) => { loadChat(id); setIsSidebarOpen(false); }} onDeleteChat={(id) => deleteChat(id)} onLogout={logout} onLogin={login} onToggleMic={() => toggleMic((t) => window.dispatchEvent(new CustomEvent('vimo-transcript', { detail: t })))} isAuthBusy={isAuthBusy} chatError={chatError} />
       </div>
 
       <div className="flex-1 flex flex-col min-w-0">
@@ -152,6 +170,14 @@ const App: React.FC = () => {
               <span className="font-medium">VIMO V1.0</span>
               <ChevronDown size={11} />
             </div>
+            <button
+              onClick={toggleMute}
+              className="p-2 rounded-xl bg-white/5 border border-white/10 text-white/40 hover:text-white/80 hover:bg-white/10 transition-colors"
+              aria-label={isMuted ? 'Ativar voz' : 'Calar voz'}
+              title={isMuted ? 'Voz desligada' : 'Voz ligada'}
+            >
+              {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+            </button>
           </div>
           <div className="flex items-center">
             <div className="hidden sm:flex gap-3 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-center">
@@ -162,7 +188,7 @@ const App: React.FC = () => {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto vimo-scroll p-4 sm:p-6">
+        <main ref={mainRef} className="flex-1 overflow-y-auto vimo-scroll p-4 sm:p-6">
           {!hasMessages ? (
             <div className="h-full flex flex-col items-center justify-center gap-6">
               <VimoSphere isConnected={isConnected} isSpeaking={isSpeaking} />
