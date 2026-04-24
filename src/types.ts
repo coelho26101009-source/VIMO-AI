@@ -1,4 +1,4 @@
-export type MessageSource = 'USER' | 'HELIOS' | 'SYSTEM' | 'ERROR';
+export type MessageSource = 'USER' | 'VIMO' | 'SYSTEM' | 'ERROR';
 
 export interface LogMessage {
   id: string;
