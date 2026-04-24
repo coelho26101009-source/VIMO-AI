@@ -11,39 +11,51 @@ const ChatItem: React.FC<{
   onLoad: () => void;
   onDelete: () => void;
 }> = ({ chat, isActive, isCodeMode = false, onLoad, onDelete }) => {
-  const [hovered, setHovered] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (confirmDelete) {
+      onDelete();
+    } else {
+      setConfirmDelete(true);
+      setTimeout(() => setConfirmDelete(false), 2500);
+    }
+  };
+
   return (
     <div
-      className="relative flex items-center rounded-xl transition-all duration-150"
+      className="group relative flex items-center gap-2 px-3 py-2.5 rounded-xl transition-all duration-150 cursor-pointer"
       style={{
         background: isActive
           ? isCodeMode
             ? 'linear-gradient(135deg,rgba(34,197,94,0.15),rgba(22,163,74,0.1))'
             : 'linear-gradient(135deg,rgba(124,58,237,0.2),rgba(99,102,241,0.15))'
-          : hovered ? 'rgba(255,255,255,0.04)' : 'transparent',
+          : undefined,
         border: isActive
           ? isCodeMode ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(139,92,246,0.3)'
           : '1px solid transparent',
       }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onClick={onLoad}
     >
-      <button
-        onClick={onLoad}
-        className="flex-1 text-left px-3 py-2.5 text-sm truncate"
-        style={{ color: isActive ? (isCodeMode ? '#86efac' : '#c4b5fd') : 'rgba(255,255,255,0.4)' }}
+      <MessageSquare size={12} className="shrink-0 opacity-30" />
+      <span
+        className="flex-1 text-sm truncate"
+        style={{ color: isActive ? (isCodeMode ? '#86efac' : '#c4b5fd') : 'rgba(255,255,255,0.45)' }}
       >
         {chat.title}
+      </span>
+      <button
+        onClick={handleDelete}
+        className={`shrink-0 p-1 rounded-lg transition-all opacity-0 group-hover:opacity-100 ${
+          confirmDelete
+            ? 'text-red-400 bg-red-500/15 opacity-100'
+            : 'text-white/20 hover:text-red-400 hover:bg-red-500/10'
+        }`}
+        title={confirmDelete ? 'Clica novamente para confirmar' : 'Apagar conversa'}
+      >
+        <Trash2 size={12} />
       </button>
-      {hovered && (
-        <button
-          onClick={e => { e.stopPropagation(); onDelete(); }}
-          className="shrink-0 p-1.5 mr-1 rounded-lg text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-all"
-          title="Apagar conversa"
-        >
-          <Trash2 size={13} />
-        </button>
-      )}
     </div>
   );
 };
@@ -132,19 +144,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onMouseEnter={e => (e.currentTarget.style.boxShadow = `0 6px 28px ${c.btnShadowH}`)}
           onMouseLeave={e => (e.currentTarget.style.boxShadow = `0 4px 20px ${c.btnShadow}`)}
         >
-          <MessageSquare size={16} />
-          Conversas
-        </button>
-      </div>
-
-      <div className="px-4 pt-2">
-        <button
-          onClick={onNewChat}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl font-semibold text-sm transition-all duration-200"
-          style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${c.border}`, color: 'rgba(255,255,255,0.65)' }}
-          onMouseEnter={e => { e.currentTarget.style.background = c.btnHoverBg; e.currentTarget.style.color = 'white'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = 'rgba(255,255,255,0.65)'; }}
-        >
           <Plus size={16} />
           Nova conversa
         </button>
@@ -154,16 +153,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* ── Histórico ── */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1 vimo-scroll">
-        {user && chatList.length > 0 && chatList.map(chat => (
-          <ChatItem
-            key={chat.id}
-            chat={chat}
-            isActive={currentChatId === chat.id}
-            isCodeMode={isCodeMode}
-            onLoad={() => onLoadChat(chat.id)}
-            onDelete={() => onDeleteChat(chat.id)}
-          />
-        ))}
+        {user && chatList.length > 0 && (
+          <>
+            <div className="flex items-center justify-between px-1 mb-2">
+              <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.2)' }}>
+                Histórico
+              </span>
+              <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.15)' }}>
+                {chatList.length} conversa{chatList.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+            {chatList.map(chat => (
+              <ChatItem
+                key={chat.id}
+                chat={chat}
+                isActive={currentChatId === chat.id}
+                isCodeMode={isCodeMode}
+                onLoad={() => onLoadChat(chat.id)}
+                onDelete={() => onDeleteChat(chat.id)}
+              />
+            ))}
+          </>
+        )}
 
         {isGuest && (
           <div className="mt-2 p-4 rounded-2xl text-center"
