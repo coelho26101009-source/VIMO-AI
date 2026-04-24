@@ -2,7 +2,18 @@ import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Copy, Check } from 'lucide-react';
+import { Copy, Check, Download } from 'lucide-react';
+
+const EXT_MAP: Record<string, string> = {
+  typescript: 'ts', javascript: 'js', tsx: 'tsx', jsx: 'jsx',
+  python: 'py', html: 'html', css: 'css', scss: 'scss',
+  rust: 'rs', go: 'go', java: 'java', kotlin: 'kt',
+  cpp: 'cpp', c: 'c', csharp: 'cs', php: 'php',
+  ruby: 'rb', swift: 'swift', dart: 'dart', bash: 'sh',
+  shell: 'sh', sh: 'sh', sql: 'sql', json: 'json',
+  yaml: 'yaml', yml: 'yml', toml: 'toml', markdown: 'md',
+  xml: 'xml', svg: 'svg', graphql: 'graphql',
+};
 
 const CopyButton: React.FC<{ text: string }> = ({ text }) => {
   const [copied, setCopied] = useState(false);
@@ -23,6 +34,31 @@ const CopyButton: React.FC<{ text: string }> = ({ text }) => {
   );
 };
 
+const DownloadButton: React.FC<{ text: string; language: string }> = ({ text, language }) => {
+  const ext = EXT_MAP[language.toLowerCase()] ?? 'txt';
+  const handleDownload = () => {
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `vimo_code.${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+  return (
+    <button
+      onClick={handleDownload}
+      className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-md bg-green-500/10 hover:bg-green-500/20 text-green-400 hover:text-green-300 transition-all"
+      title={`Descarregar como .${ext}`}
+    >
+      <Download size={12} />
+      <span>.{ext}</span>
+    </button>
+  );
+};
+
 export const MarkdownMessage: React.FC<{ text: string; isCodeMode?: boolean }> = ({ text, isCodeMode = false }) => (
   <ReactMarkdown
     components={{
@@ -36,7 +72,10 @@ export const MarkdownMessage: React.FC<{ text: string; isCodeMode?: boolean }> =
               <span className={`text-xs font-bold uppercase tracking-wider font-mono ${isCodeMode ? 'text-green-400' : 'text-purple-300'}`}>
                 {isCodeMode ? `> ${match[1]}` : match[1]}
               </span>
-              <CopyButton text={content} />
+              <div className="flex items-center gap-2">
+                {isCodeMode && <DownloadButton text={content} language={match[1]} />}
+                <CopyButton text={content} />
+              </div>
             </div>
             <SyntaxHighlighter
               style={vscDarkPlus}
