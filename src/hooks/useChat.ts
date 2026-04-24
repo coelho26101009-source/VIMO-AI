@@ -108,6 +108,8 @@ export const useChat = (user: User | null, onReply: (text: string) => void, code
     setLogs(currentLogs);
     setIsLoading(true);
 
+    // ── 1. Chamada à API do Groq ────────────────────────────────
+    let replyText = '';
     try {
       const systemPrompt = codeMode
         ? `Tu és o Vimo em modo PROGRAMADOR, assistente técnico de código criado pelo Simão. Utilizador: ${userName}. Responde em PT-PT. Tom direto, zero preâmbulos. Nunca repitas o enunciado nem confirmes que entendeste. Código sempre completo e executável com linguagem indicada nos blocos. Comentários só onde o porquê não é óbvio. Aponta erros pela causa raiz. Pede esclarecimento se ambíguo.`
@@ -117,7 +119,6 @@ export const useChat = (user: User | null, onReply: (text: string) => void, code
         { role: 'system', content: systemPrompt },
       ];
 
-      // Janela deslizante — só envia as últimas N mensagens para preservar contexto sem estourar tokens.
       const recentLogs = logs.slice(-MAX_HISTORY_MESSAGES);
       recentLogs.forEach(l => {
         if (l.source === 'USER') apiMessages.push({ role: 'user', content: l.text });
@@ -137,7 +138,6 @@ export const useChat = (user: User | null, onReply: (text: string) => void, code
       }
 
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      // Quando se usa um proxy, a chave fica do lado do servidor — não a enviamos do cliente.
       if (GROQ_API_KEY) headers.Authorization = `Bearer ${GROQ_API_KEY}`;
 
       const response = await fetch(GROQ_API_URL, {
@@ -151,55 +151,55 @@ export const useChat = (user: User | null, onReply: (text: string) => void, code
       });
 
       if (!response.ok) throw new Error(`Groq API: ${response.statusText}`);
-
       const data = await response.json();
-      const replyText = (data.choices[0]?.message?.content as string) || 'Sem resposta.';
-
-      const vimoMsg: LogMessage = {
-        id: makeId(),
-        source: 'VIMO',
-        text: replyText,
-        timestamp: makeTimestamp(),
-      };
-
-      const updatedLogs = [...currentLogs, vimoMsg];
-      setLogs(updatedLogs);
-      onReply(replyText);
-
-      if (user) {
-        if (!currentChatId) {
-          // Chat novo — cria doc + subcoleção 'messages'.
-          const chatRef = await addDoc(collection(db, 'chats'), {
-            userId: user.uid,
-            title: text.substring(0, 35) || 'Nova Conversa',
-            updatedAt: serverTimestamp(),
-          });
-          await Promise.all([
-            addDoc(collection(db, 'chats', chatRef.id, 'messages'), { ...userMsg, createdAt: serverTimestamp() }),
-            addDoc(collection(db, 'chats', chatRef.id, 'messages'), { ...vimoMsg, createdAt: serverTimestamp() }),
-          ]);
-          setCurrentChatId(chatRef.id);
-          setIsLegacyChat(false);
-        } else if (isLegacyChat) {
-          // Mantém compatibilidade com chats antigos que guardam tudo num array.
-          await updateDoc(doc(db, 'chats', currentChatId), {
-            updatedAt: serverTimestamp(),
-            messages: updatedLogs,
-          });
-        } else {
-          // Append incremental: só escreve as duas mensagens novas, não reescreve tudo.
-          await Promise.all([
-            addDoc(collection(db, 'chats', currentChatId, 'messages'), { ...userMsg, createdAt: serverTimestamp() }),
-            addDoc(collection(db, 'chats', currentChatId, 'messages'), { ...vimoMsg, createdAt: serverTimestamp() }),
-            updateDoc(doc(db, 'chats', currentChatId), { updatedAt: serverTimestamp() }),
-          ]);
-        }
-      }
+      replyText = (data.choices[0]?.message?.content as string) || 'Sem resposta.';
     } catch (e: unknown) {
       console.error(e);
       addLog('ERROR', 'Falha na comunicação com o servidor. Tenta novamente.');
-    } finally {
       setIsLoading(false);
+      return;
+    }
+
+    // ── 2. Mostra a resposta na UI ───────────────────────────────
+    const vimoMsg: LogMessage = {
+      id: makeId(), source: 'VIMO', text: replyText, timestamp: makeTimestamp(),
+    };
+    const updatedLogs = [...currentLogs, vimoMsg];
+    setLogs(updatedLogs);
+    setIsLoading(false);
+    onReply(replyText);
+
+    // ── 3. Guarda no Firebase (falha silenciosa — não afeta a conversa) ──
+    if (!user) return;
+    try {
+      if (!currentChatId) {
+        const chatRef = await addDoc(collection(db, 'chats'), {
+          userId: user.uid,
+          title: text.substring(0, 35) || 'Nova Conversa',
+          updatedAt: serverTimestamp(),
+        });
+        // Define o ID antes de guardar mensagens para não perder referência em caso de erro parcial
+        setCurrentChatId(chatRef.id);
+        setIsLegacyChat(false);
+        await Promise.all([
+          addDoc(collection(db, 'chats', chatRef.id, 'messages'), { ...userMsg, createdAt: serverTimestamp() }),
+          addDoc(collection(db, 'chats', chatRef.id, 'messages'), { ...vimoMsg, createdAt: serverTimestamp() }),
+        ]);
+      } else if (isLegacyChat) {
+        await updateDoc(doc(db, 'chats', currentChatId), {
+          updatedAt: serverTimestamp(),
+          messages: updatedLogs,
+        });
+      } else {
+        await Promise.all([
+          addDoc(collection(db, 'chats', currentChatId, 'messages'), { ...userMsg, createdAt: serverTimestamp() }),
+          addDoc(collection(db, 'chats', currentChatId, 'messages'), { ...vimoMsg, createdAt: serverTimestamp() }),
+          updateDoc(doc(db, 'chats', currentChatId), { updatedAt: serverTimestamp() }),
+        ]);
+      }
+    } catch (firebaseErr: unknown) {
+      // Erro silencioso — a conversa continua na memória sem interromper o utilizador
+      console.error('[Firebase]', firebaseErr);
     }
   }, [logs, isLoading, currentChatId, isLegacyChat, user, onReply, addLog]);
 
