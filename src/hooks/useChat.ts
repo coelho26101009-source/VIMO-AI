@@ -25,7 +25,7 @@ const normalizeMessage = (m: any): LogMessage => ({
   source: m.source === 'HELIOS' ? 'VIMO' : m.source,
 });
 
-export const useChat = (user: User | null, onReply: (text: string) => void) => {
+export const useChat = (user: User | null, onReply: (text: string) => void, codeMode = false) => {
   const [logs, setLogs] = useState<LogMessage[]>([]);
   const [chatList, setChatList] = useState<Chat[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
@@ -109,11 +109,18 @@ export const useChat = (user: User | null, onReply: (text: string) => void) => {
     setIsLoading(true);
 
     try {
+      const systemPrompt = codeMode
+        ? `Tu és o Vimo em modo PROGRAMAÇÃO, um assistente especializado em código, criado pelo Simão. Estás a falar com ${userName}. Responde sempre em Português de Portugal (PT-PT). No modo programação:
+- Fornece sempre código completo, funcional e pronto a copiar.
+- Usa sempre blocos de código com a linguagem correta indicada (ex: \`\`\`typescript, \`\`\`python, etc.).
+- Estrutura bem o código com indentação correta e comentários apenas quando necessário para entender algo não óbvio.
+- Explica brevemente o que o código faz antes ou depois do bloco.
+- Prefere soluções modernas e boas práticas.
+- Se forem vários ficheiros, separa cada um com o respetivo nome como título.`
+        : `Tu és o Vimo, o assistente inteligente do VimoMind AI, criado pelo Simão. Estás a falar com ${userName}. Responde sempre em Português de Portugal (PT-PT), com um tom amigável, enérgico e próximo — como um amigo que percebe muito de tecnologia. Sê direto, claro e usa um toque de bom humor quando fizer sentido. Quando apresentares código, usa blocos de código com a linguagem indicada. Celebra as conquistas do utilizador e encoraja-o quando encontra dificuldades.`;
+
       const apiMessages: { role: string; content: unknown }[] = [
-        {
-          role: 'system',
-          content: `Tu és o Vimo, o assistente inteligente do VimoMind AI, criado pelo Simão. Estás a falar com ${userName}. Responde sempre em Português de Portugal (PT-PT), com um tom profissional mas acessível. Quando apresentares código, usa blocos de código com a linguagem indicada.`,
-        },
+        { role: 'system', content: systemPrompt },
       ];
 
       // Janela deslizante — só envia as últimas N mensagens para preservar contexto sem estourar tokens.

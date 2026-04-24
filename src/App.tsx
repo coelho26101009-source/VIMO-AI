@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ChevronDown, Menu, Volume2, VolumeX, User } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
+import { ChevronDown, Menu, Volume2, VolumeX, User, Code2 } from 'lucide-react';
+import { MarkdownMessage } from './components/MarkdownMessage';
 
 import { useAuth } from './hooks/useAuth';
 import { useChat } from './hooks/useChat';
@@ -57,6 +57,7 @@ const App: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
+  const [isCodeMode, setIsCodeMode] = useState(false);
   const [currentTime, setCurrentTime] = useState('--:--:--');
   const [currentDate, setCurrentDate] = useState('--/--');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -67,7 +68,7 @@ const App: React.FC = () => {
   };
 
   const { logs, chatList, currentChatId, isLoading, sendMessage, newChat, loadChat, deleteChat, subscribeToChats } =
-    useChat(user, isMuted ? () => {} : speak);
+    useChat(user, isMuted ? () => {} : speak, isCodeMode);
 
   const hasMessages = logs.filter(l => l.source !== 'SYSTEM').length > 0;
 
@@ -127,6 +128,18 @@ const App: React.FC = () => {
             </button>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsCodeMode(prev => !prev)}
+              title={isCodeMode ? 'Mudar para modo normal' : 'Mudar para modo código'}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all duration-200 ${
+                isCodeMode
+                  ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.2)]'
+                  : 'bg-white/5 border-white/10 text-white/40 hover:text-white/70 hover:bg-white/10'
+              }`}
+            >
+              <Code2 size={14} />
+              <span className="hidden sm:inline">MOD CODE</span>
+            </button>
             <div className="hidden sm:flex gap-3 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-center">
               <div><p className="font-mono text-xs text-purple-400 leading-none">{currentTime}</p><p className="text-[9px] text-white/20 mt-0.5">HORA</p></div>
               <div className="w-px h-6 bg-white/10" />
@@ -156,7 +169,7 @@ const App: React.FC = () => {
                   <div className={`max-w-[85%] flex flex-col ${log.source === 'USER' ? 'items-end' : 'items-start'}`}>
                     <span className="text-[10px] text-white/20 mb-1">{log.timestamp}</span>
                     <div className={`px-4 py-3 text-sm rounded-2xl ${log.source === 'USER' ? 'bg-purple-600/20 border border-purple-500/30 text-white' : 'bg-white/5 border border-white/10 text-gray-200'}`}>
-                      <ReactMarkdown>{log.text}</ReactMarkdown>
+                      <MarkdownMessage text={log.text} />
                     </div>
                   </div>
                 </div>
