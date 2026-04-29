@@ -137,8 +137,21 @@ export const useChat = (user: User | null, onReply: (text: string) => void, code
         apiMessages.push({ role: 'user', content: text });
       }
 
+      const callGroq = async (msgs: typeof apiMessages, temp: number) => {
+        const model = attachment ? VISION_MODEL : TEXT_MODEL;
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (GROQ_API_KEY) headers.Authorization = `Bearer ${GROQ_API_KEY}`;
+        const res = await fetch(GROQ_API_URL, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ model, messages: msgs, temperature: temp }),
+        });
+        if (!res.ok) throw new Error(`Groq API ${res.status}: ${res.statusText}`);
+        const d = await res.json();
+        return (d.choices[0]?.message?.content as string) || 'Sem resposta.';
+      };
+
       if (codeMode) {
-        // API nativa do Gemini (mais fiável que o endpoint OpenAI-compatível)
         const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${CODE_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
         const geminiContents = apiMessages
           .filter(m => m.role !== 'system')
@@ -146,31 +159,28 @@ export const useChat = (user: User | null, onReply: (text: string) => void, code
             role: m.role === 'assistant' ? 'model' : 'user',
             parts: [{ text: m.content as string }],
           }));
-        const geminiBody = {
-          system_instruction: { parts: [{ text: systemPrompt }] },
-          contents: geminiContents,
-          generationConfig: { temperature: 0.3 },
-        };
         const geminiRes = await fetch(geminiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(geminiBody),
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: systemPrompt }] },
+            contents: geminiContents,
+            generationConfig: { temperature: 0.3 },
+          }),
         });
-        if (!geminiRes.ok) throw new Error(`Gemini API ${geminiRes.status}: ${geminiRes.statusText}`);
-        const geminiData = await geminiRes.json();
-        replyText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || 'Sem resposta.';
+
+        if (geminiRes.status === 429 || !geminiRes.ok && geminiRes.status >= 500) {
+          // Quota esgotada ou erro do servidor — fallback para Groq com o mesmo prompt de código
+          console.warn(`Gemini ${geminiRes.status}, a usar Groq como fallback.`);
+          replyText = await callGroq(apiMessages, 0.3);
+        } else if (!geminiRes.ok) {
+          throw new Error(`Gemini API ${geminiRes.status}: ${geminiRes.statusText}`);
+        } else {
+          const geminiData = await geminiRes.json();
+          replyText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || 'Sem resposta.';
+        }
       } else {
-        const model = attachment ? VISION_MODEL : TEXT_MODEL;
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (GROQ_API_KEY) headers.Authorization = `Bearer ${GROQ_API_KEY}`;
-        const response = await fetch(GROQ_API_URL, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ model, messages: apiMessages, temperature: 0.7 }),
-        });
-        if (!response.ok) throw new Error(`Groq API ${response.status}: ${response.statusText}`);
-        const data = await response.json();
-        replyText = (data.choices[0]?.message?.content as string) || 'Sem resposta.';
+        replyText = await callGroq(apiMessages, 0.7);
       }
     } catch (e: unknown) {
       console.error(e);
