@@ -6,11 +6,11 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { LogMessage, Chat, Attachment } from '../types';
+import { CODE_MODEL, GEMINI_API_KEY, GEMINI_API_URL, buildCodeSystemPrompt } from '../config/codeMode';
 
 const TEXT_MODEL = 'llama-3.3-70b-versatile';
 const VISION_MODEL = 'llama-3.2-11b-vision-preview';
 const GROQ_API_KEY = (import.meta as any).env.VITE_GROQ_API_KEY;
-// Permite redirecionar para um proxy (recomendado em produção para esconder a API key).
 const GROQ_API_URL =
   (import.meta as any).env.VITE_GROQ_API_URL ||
   'https://api.groq.com/openai/v1/chat/completions';
@@ -112,7 +112,7 @@ export const useChat = (user: User | null, onReply: (text: string) => void, code
     let replyText = '';
     try {
       const systemPrompt = codeMode
-        ? `Tu és o VUXIO em modo PROGRAMADOR, assistente técnico criado pelo Simão. Utilizador: ${userName}. Responde em PT-PT. Tom direto e sem preâmbulos. Regras obrigatórias: (1) Só escreves código se o utilizador pedir explicitamente para criar, fazer, escrever ou corrigir código. (2) Se a pergunta for teórica ou conceptual, responde em texto, nunca em código. (3) Respostas curtas: máximo 5-6 linhas, exceto quando o utilizador pedir algo longo como um projeto completo, composição ou explicação detalhada. (4) Nunca repitas o enunciado. (5) Pede esclarecimento se a pergunta for ambígua.`
+        ? buildCodeSystemPrompt(userName)
         : `Tu és o VUXIO, assistente simpático e amigo criado pelo Simão. Utilizador: ${userName}. Responde sempre em PT-PT com tom caloroso, natural e direto — como um amigo que sabe muito. Regras obrigatórias: (1) Só escreves código se o utilizador pedir explicitamente para criar, fazer, escrever ou corrigir código. Para perguntas normais, responde em texto simples. (2) Respostas curtas: máximo 5-6 linhas. Só escreves mais quando o utilizador pedir uma composição, texto longo, explicação detalhada ou lista extensa. (3) Não uses frases de enchimento como "Claro!", "Com certeza!" ou "Boa pergunta!". (4) Não repitas o que o utilizador disse. (5) Se não souberes algo, diz com honestidade.`;
 
       const apiMessages: { role: string; content: unknown }[] = [
@@ -137,16 +137,20 @@ export const useChat = (user: User | null, onReply: (text: string) => void, code
         apiMessages.push({ role: 'user', content: text });
       }
 
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (GROQ_API_KEY) headers.Authorization = `Bearer ${GROQ_API_KEY}`;
+      const apiKey = codeMode ? GEMINI_API_KEY : GROQ_API_KEY;
+      const apiUrl = codeMode ? GEMINI_API_URL : GROQ_API_URL;
+      const model = codeMode ? CODE_MODEL : (attachment ? VISION_MODEL : TEXT_MODEL);
 
-      const response = await fetch(GROQ_API_URL, {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          model: attachment ? VISION_MODEL : TEXT_MODEL,
+          model,
           messages: apiMessages,
-          temperature: 0.7,
+          temperature: codeMode ? 0.3 : 0.7,
         }),
       });
 
