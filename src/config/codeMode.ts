@@ -2,7 +2,7 @@
 // Usa o Gemini (melhor para código) em vez do Groq.
 // Muda aqui o modelo ou o prompt sem tocar no resto da app.
 
-export const CODE_MODEL = 'gemini-1.5-flash';
+export const CODE_MODEL = 'gemini-2.0-flash';
 
 export const GEMINI_API_KEY = (import.meta as any).env.VITE_GEMINI_API_KEY as string;
 
