@@ -7,10 +7,9 @@ import { VuxioAvatar } from './VuxioAvatar';
 const ChatItem: React.FC<{
   chat: Chat;
   isActive: boolean;
-  isCodeMode?: boolean;
   onLoad: () => void;
   onDelete: () => void;
-}> = ({ chat, isActive, isCodeMode = false, onLoad, onDelete }) => {
+}> = ({ chat, isActive, onLoad, onDelete }) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const handleDelete = (e: React.MouseEvent) => {
@@ -23,28 +22,34 @@ const ChatItem: React.FC<{
     }
   };
 
+  const chatIsCode = chat.isCodeMode ?? false;
+  const activeColor = chatIsCode ? 'rgba(34,197,94,0.3)' : 'rgba(139,92,246,0.3)';
+  const activeBg    = chatIsCode
+    ? 'linear-gradient(135deg,rgba(34,197,94,0.15),rgba(22,163,74,0.1))'
+    : 'linear-gradient(135deg,rgba(124,58,237,0.2),rgba(99,102,241,0.15))';
+
   return (
     <div
       className="group relative flex items-center gap-2 px-3 py-2.5 rounded-xl transition-all duration-150 cursor-pointer"
       style={{
-        background: isActive
-          ? isCodeMode
-            ? 'linear-gradient(135deg,rgba(34,197,94,0.15),rgba(22,163,74,0.1))'
-            : 'linear-gradient(135deg,rgba(124,58,237,0.2),rgba(99,102,241,0.15))'
-          : undefined,
-        border: isActive
-          ? isCodeMode ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(139,92,246,0.3)'
-          : '1px solid transparent',
+        background: isActive ? activeBg : undefined,
+        border: isActive ? `1px solid ${activeColor}` : '1px solid transparent',
       }}
       onClick={onLoad}
     >
       <MessageSquare size={12} className="shrink-0 opacity-30" />
       <span
         className="flex-1 text-sm truncate"
-        style={{ color: isActive ? (isCodeMode ? '#86efac' : '#c4b5fd') : 'rgba(255,255,255,0.45)' }}
+        style={{ color: isActive ? (chatIsCode ? '#86efac' : '#c4b5fd') : 'rgba(255,255,255,0.45)' }}
       >
         {chat.title}
       </span>
+      {chatIsCode && (
+        <span className="shrink-0 text-[8px] font-bold font-mono px-1.5 py-0.5 rounded"
+          style={{ background: 'rgba(34,197,94,0.15)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.2)' }}>
+          CODE
+        </span>
+      )}
       <button
         onClick={handleDelete}
         className={`shrink-0 p-1 rounded-lg transition-all opacity-0 group-hover:opacity-100 ${
@@ -168,7 +173,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 key={chat.id}
                 chat={chat}
                 isActive={currentChatId === chat.id}
-                isCodeMode={isCodeMode}
                 onLoad={() => onLoadChat(chat.id)}
                 onDelete={() => onDeleteChat(chat.id)}
               />

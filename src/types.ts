@@ -10,7 +10,7 @@ export interface LogMessage {
 export interface Chat {
   id: string;
   title: string;
-  updatedAt?: Date;
+  isCodeMode?: boolean;
 }
 
 export interface Attachment {
