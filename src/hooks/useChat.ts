@@ -5,7 +5,7 @@ import {
   addDoc, updateDoc, setDoc, doc, serverTimestamp, getDocs, deleteDoc,
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import type { LogMessage, Chat, Attachment } from '../types';
+import type { LogMessage, Chat, Attachment, SearchSource } from '../types';
 import { CODE_MODEL, GEMINI_API_KEY, buildCodeSystemPrompt } from '../config/codeMode';
 
 // ── Firestore paths ───────────────────────────────────────────────────────────
@@ -15,11 +15,39 @@ const chatDoc  = (uid: string, cid: string) => doc(db, 'users', uid, 'chats', ci
 const msgsCol  = (uid: string, cid: string) => collection(db, 'users', uid, 'chats', cid, 'messages');
 
 // ── AI config ─────────────────────────────────────────────────────────────────
-const TEXT_MODEL   = 'llama-3.3-70b-versatile';
-const VISION_MODEL = 'llama-3.2-11b-vision-preview';
-const GROQ_API_KEY = (import.meta as any).env.VITE_GROQ_API_KEY as string;
-const GROQ_API_URL = (import.meta as any).env.VITE_GROQ_API_URL || 'https://api.groq.com/openai/v1/chat/completions';
-const MAX_HISTORY  = 30;
+const TEXT_MODEL    = 'llama-3.3-70b-versatile';
+const VISION_MODEL  = 'llama-3.2-11b-vision-preview';
+const GROQ_API_KEY  = (import.meta as any).env.VITE_GROQ_API_KEY  as string;
+const GROQ_API_URL  = (import.meta as any).env.VITE_GROQ_API_URL  || 'https://api.groq.com/openai/v1/chat/completions';
+const TAVILY_KEY    = (import.meta as any).env.VITE_TAVILY_API_KEY as string;
+const MAX_HISTORY   = 30;
+
+// ── Tavily web search ─────────────────────────────────────────────────────────
+const searchWeb = async (query: string): Promise<SearchSource[]> => {
+  try {
+    const res = await fetch('https://api.tavily.com/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key:      TAVILY_KEY,
+        query,
+        search_depth: 'basic',
+        max_results:  5,
+        include_answer: false,
+      }),
+    });
+    if (!res.ok) throw new Error(`Tavily ${res.status}`);
+    const data = await res.json();
+    return (data.results ?? []).map((r: any) => ({
+      title:   r.title   as string,
+      url:     r.url     as string,
+      content: r.content as string,
+    }));
+  } catch (err) {
+    console.error('[Tavily]', err);
+    return [];
+  }
+};
 
 type ApiMsg = { role: string; content: unknown };
 
@@ -135,22 +163,30 @@ const generateTitle = async (firstMsg: string): Promise<string> => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const useChat = (user: User | null, onReply: (text: string) => void, codeMode = false) => {
+export const useChat = (
+  user: User | null,
+  onReply: (text: string) => void,
+  codeMode  = false,
+  webMode   = false,
+) => {
   const [logs,          setLogs]          = useState<LogMessage[]>([]);
   const [chatList,      setChatList]      = useState<Chat[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [isLoading,     setIsLoading]     = useState(false);
   const [isStreaming,   setIsStreaming]   = useState(false);
+  const [isSearching,   setIsSearching]   = useState(false);
 
   // Refs — always current values without re-creating callbacks
-  const userRef    = useRef(user);
-  const logsRef    = useRef(logs);
-  const chatIdRef  = useRef(currentChatId);
-  const codeModeRef = useRef(codeMode);
-  userRef.current   = user;
-  logsRef.current   = logs;
-  chatIdRef.current = currentChatId;
+  const userRef       = useRef(user);
+  const logsRef       = useRef(logs);
+  const chatIdRef     = useRef(currentChatId);
+  const codeModeRef   = useRef(codeMode);
+  const webModeRef    = useRef(webMode);
+  userRef.current     = user;
+  logsRef.current     = logs;
+  chatIdRef.current   = currentChatId;
   codeModeRef.current = codeMode;
+  webModeRef.current  = webMode;
 
   const makeId        = () => Math.random().toString(36).substring(2, 9);
   const makeTimestamp = () => new Date().toLocaleTimeString('pt-PT', { hour12: false });
@@ -164,11 +200,20 @@ export const useChat = (user: User | null, onReply: (text: string) => void, code
     attachment: Attachment | null,
     userName: string,
     onChunk: (partial: string) => void,
+    webResults?: SearchSource[],
   ): Promise<string> => {
     const cm = codeModeRef.current;
-    const systemPrompt = cm
+
+    let systemPrompt = cm
       ? buildCodeSystemPrompt(userName)
       : `Tu és o VUXIO, assistente simpático criado pelo Simão. Utilizador: ${userName}. Responde em PT-PT, tom caloroso e direto. Regras: (1) Código só se pedido explicitamente. (2) Máx 5-6 linhas salvo pedido de texto longo. (3) Sem frases de enchimento. (4) Não repitas o que o utilizador disse.`;
+
+    if (webResults && webResults.length > 0) {
+      const ctx = webResults
+        .map((r: any, i: number) => `[${i + 1}] ${r.title}\nURL: ${r.url}\n${r.content ?? ''}`)
+        .join('\n\n');
+      systemPrompt += `\n\nRESULTADOS DA PESQUISA WEB (usa como contexto factual):\n${ctx}\n\nResponde com base nos resultados. No final inclui sempre "**Fontes:**" com os links no formato [Título](URL).`;
+    }
 
     const apiMsgs: ApiMsg[] = [
       { role: 'system', content: systemPrompt },
@@ -253,13 +298,22 @@ export const useChat = (user: User | null, onReply: (text: string) => void, code
 
     setLogs([...logsWithUser, placeholder]);
     setIsLoading(true);
+
+    // ── Web search (if mode active) ─────────────────────────────────────────
+    let webResults: SearchSource[] | undefined;
+    if (webModeRef.current && text) {
+      setIsSearching(true);
+      webResults = await searchWeb(text);
+      setIsSearching(false);
+    }
+
     setIsStreaming(true);
 
     let replyText = '';
     try {
       replyText = await callAI(history, userMsg, attachment, userName, partial => {
         setLogs(prev => prev.map(m => m.id === streamId ? { ...m, text: partial } : m));
-      });
+      }, webResults);
     } catch (err) {
       console.error('[VUXIO]', err);
       const cm = codeModeRef.current;
@@ -357,7 +411,7 @@ export const useChat = (user: User | null, onReply: (text: string) => void, code
   }, [isLoading, callAI, onReply]);
 
   return {
-    logs, chatList, currentChatId, isLoading, isStreaming,
+    logs, chatList, currentChatId, isLoading, isStreaming, isSearching,
     sendMessage, regenerate, newChat, loadChat, deleteChat, subscribeToChats,
   };
 };

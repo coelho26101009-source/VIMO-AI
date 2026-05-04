@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ChevronDown, Menu, Volume2, VolumeX, User, Code2, Copy, Check, RefreshCw } from 'lucide-react';
+import { ChevronDown, Menu, Volume2, VolumeX, User, Code2, Copy, Check, RefreshCw, Globe } from 'lucide-react';
 import { MarkdownMessage } from './components/MarkdownMessage';
 
 import { useAuth } from './hooks/useAuth';
@@ -118,6 +118,7 @@ const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
   const [isCodeMode, setIsCodeMode] = useState(false);
+  const [isWebMode,  setIsWebMode]  = useState(false);
   const [currentTime, setCurrentTime] = useState('--:--:--');
   const [currentDate, setCurrentDate] = useState('--/--');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -127,8 +128,8 @@ const App: React.FC = () => {
     setIsMuted(prev => !prev);
   };
 
-  const { logs, chatList, currentChatId, isLoading, isStreaming, sendMessage, regenerate, newChat, loadChat, deleteChat, subscribeToChats } =
-    useChat(user, isMuted ? () => {} : speak, isCodeMode);
+  const { logs, chatList, currentChatId, isLoading, isStreaming, isSearching, sendMessage, regenerate, newChat, loadChat, deleteChat, subscribeToChats } =
+    useChat(user, isMuted ? () => {} : speak, isCodeMode, isWebMode);
 
   const hasMessages = logs.filter(l => l.source !== 'SYSTEM').length > 0;
 
@@ -189,7 +190,19 @@ const App: React.FC = () => {
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setIsCodeMode(prev => !prev)}
+              onClick={() => { setIsWebMode(prev => !prev); setIsCodeMode(false); }}
+              title={isWebMode ? 'Desativar pesquisa web' : 'Ativar pesquisa web'}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all duration-200 ${
+                isWebMode
+                  ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.2)]'
+                  : 'bg-white/5 border-white/10 text-white/40 hover:text-white/70 hover:bg-white/10'
+              }`}
+            >
+              <Globe size={14} />
+              <span className="hidden sm:inline">WEB</span>
+            </button>
+            <button
+              onClick={() => { setIsCodeMode(prev => !prev); setIsWebMode(false); }}
               title={isCodeMode ? 'Mudar para modo normal' : 'Mudar para modo código'}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all duration-200 ${
                 isCodeMode
@@ -312,11 +325,18 @@ const App: React.FC = () => {
               {isLoading && !isStreaming && (
                 <div className="flex gap-3 items-center animate-fade-up">
                   <VuxioAvatar size={36} isConnected={isConnected} isSpeaking={true} isCodeMode={isCodeMode} />
-                  <div className={`px-4 py-3 rounded-2xl text-sm flex items-center gap-2 ${isCodeMode ? 'bg-green-900/10 border border-green-500/15 font-mono text-green-400/70' : 'bg-white/5 border border-white/10 text-white/40'}`}>
-                    <span>A pensar</span>
+                  <div className={`px-4 py-3 rounded-2xl text-sm flex items-center gap-2 ${
+                    isSearching
+                      ? 'bg-cyan-900/10 border border-cyan-500/20 text-cyan-400/70'
+                      : isCodeMode
+                        ? 'bg-green-900/10 border border-green-500/15 font-mono text-green-400/70'
+                        : 'bg-white/5 border border-white/10 text-white/40'
+                  }`}>
+                    {isSearching && <Globe size={13} className="shrink-0" />}
+                    <span>{isSearching ? 'A pesquisar na web' : 'A pensar'}</span>
                     <span className="flex gap-1 items-center">
                       {[0, 1, 2].map(i => (
-                        <span key={i} className={`w-1.5 h-1.5 rounded-full inline-block ${isCodeMode ? 'bg-green-400' : 'bg-white/40'}`}
+                        <span key={i} className={`w-1.5 h-1.5 rounded-full inline-block ${isSearching ? 'bg-cyan-400' : isCodeMode ? 'bg-green-400' : 'bg-white/40'}`}
                           style={{ animation: `VUXIO-twinkle 1.1s ease-in-out ${i * 0.22}s infinite` }} />
                       ))}
                     </span>
