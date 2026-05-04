@@ -201,12 +201,17 @@ export const useChat = (
     userName: string,
     onChunk: (partial: string) => void,
     webResults?: SearchSource[],
+    isRegenerate = false,
   ): Promise<string> => {
     const cm = codeModeRef.current;
 
     let systemPrompt = cm
       ? buildCodeSystemPrompt(userName)
       : `Tu és o VUXIO, assistente simpático criado pelo Simão. Utilizador: ${userName}. Responde em PT-PT, tom caloroso e direto. Regras: (1) Código só se pedido explicitamente. (2) Máx 5-6 linhas salvo pedido de texto longo. (3) Sem frases de enchimento. (4) Não repitas o que o utilizador disse.`;
+
+    if (isRegenerate) {
+      systemPrompt += ' IMPORTANTE: Gera uma resposta diferente da anterior — usa uma perspetiva, estrutura ou exemplos alternativos.';
+    }
 
     if (webResults && webResults.length > 0) {
       const ctx = webResults
@@ -233,9 +238,10 @@ export const useChat = (
       apiMsgs.push({ role: 'user', content: userMsg.text });
     }
 
+    const temp = isRegenerate ? 1.0 : 0.7;
     return cm
       ? streamGemini(apiMsgs, systemPrompt, onChunk)
-      : streamGroq(apiMsgs, attachment ? VISION_MODEL : TEXT_MODEL, 0.7, onChunk);
+      : streamGroq(apiMsgs, attachment ? VISION_MODEL : TEXT_MODEL, temp, onChunk);
   }, []);
 
   // ── Subscribe: real-time chat list ────────────────────────────────────────
@@ -385,7 +391,7 @@ export const useChat = (
     try {
       replyText = await callAI(history, lastUserMsg, null, userName, partial => {
         setLogs(prev => prev.map(m => m.id === streamId ? { ...m, text: partial } : m));
-      });
+      }, undefined, true);
     } catch (err) {
       console.error('[VUXIO regenerate]', err);
       setLogs(trimmed);
