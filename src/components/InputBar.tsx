@@ -6,9 +6,10 @@ interface InputBarProps {
   onSend: (text: string, attachment: Attachment | null) => void;
   isLoading: boolean;
   isConnected: boolean;
+  isCodeMode?: boolean;
 }
 
-export const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, isConnected }) => {
+export const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, isConnected, isCodeMode = false }) => {
   const [text, setText] = useState('');
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -82,7 +83,7 @@ export const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, isConnect
         className="flex items-end gap-3 px-4 py-3 rounded-2xl mx-auto max-w-2xl transition-all duration-200"
         style={{
           background: 'rgba(255,255,255,0.04)',
-          border: '1px solid rgba(139,92,246,0.2)',
+          border: isCodeMode ? '1px solid rgba(34,197,94,0.25)' : '1px solid rgba(139,92,246,0.2)',
           boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
         }}
         onFocus={() => {}}
@@ -92,7 +93,7 @@ export const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, isConnect
           onClick={() => fileRef.current?.click()}
           className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all"
           style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.35)' }}
-          onMouseEnter={e => { e.currentTarget.style.color = '#a78bfa'; e.currentTarget.style.background = 'rgba(124,58,237,0.15)'; }}
+          onMouseEnter={e => { e.currentTarget.style.color = isCodeMode ? '#4ade80' : '#a78bfa'; e.currentTarget.style.background = isCodeMode ? 'rgba(34,197,94,0.15)' : 'rgba(124,58,237,0.15)'; }}
           onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.35)'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
         >
           <Paperclip size={17} />
@@ -128,9 +129,9 @@ export const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, isConnect
           className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all duration-200"
           style={{
             background: canSend
-              ? 'linear-gradient(135deg, #7c3aed, #6366f1)'
+              ? isCodeMode ? 'linear-gradient(135deg, #16a34a, #22c55e)' : 'linear-gradient(135deg, #7c3aed, #6366f1)'
               : 'rgba(255,255,255,0.06)',
-            boxShadow: canSend ? '0 4px 16px rgba(124,58,237,0.4)' : 'none',
+            boxShadow: canSend ? isCodeMode ? '0 4px 16px rgba(34,197,94,0.4)' : '0 4px 16px rgba(124,58,237,0.4)' : 'none',
             color: canSend ? 'white' : 'rgba(255,255,255,0.2)',
           }}
         >
