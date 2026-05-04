@@ -23,15 +23,16 @@ const CopyButton: React.FC<{ text: string; isCodeMode: boolean }> = ({ text, isC
     <button
       onClick={handleCopy}
       title="Copiar mensagem"
-      className={`absolute top-2 right-2 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all ${
+      className={`flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-lg transition-colors ${
         copied
-          ? 'opacity-100 text-green-400 bg-green-500/15'
+          ? 'text-green-400 bg-green-500/15'
           : isCodeMode
-            ? 'text-green-400/40 hover:text-green-400 hover:bg-green-500/15'
-            : 'text-white/25 hover:text-white/60 hover:bg-white/10'
+            ? 'text-green-400/50 hover:text-green-400 hover:bg-green-500/10'
+            : 'text-white/30 hover:text-white/70 hover:bg-white/5'
       }`}
     >
-      {copied ? <Check size={12} /> : <Copy size={12} />}
+      {copied ? <Check size={11} /> : <Copy size={11} />}
+      <span>{copied ? 'Copiado' : 'Copiar'}</span>
     </button>
   );
 };
@@ -252,14 +253,22 @@ const App: React.FC = () => {
               {logs.filter(l => l.source !== 'SYSTEM').map((log, idx, arr) => {
                 const isLast      = idx === arr.length - 1;
                 const isLastVuxio = isLast && log.source === 'VUXIO';
+                const isVuxio     = log.source === 'VUXIO';
                 return (
                   <div key={log.id} className={`flex gap-3 animate-fade-up ${log.source === 'USER' ? 'flex-row-reverse' : ''}`}>
-                    {log.source !== 'USER' && <VuxioAvatar size={36} isConnected={isConnected} isSpeaking={isSpeaking && isLast} isCodeMode={isCodeMode} />}
-                    <div className={`max-w-[85%] flex flex-col ${log.source === 'USER' ? 'items-end' : 'items-start'}`}>
+                    {/* Avatar — stays aligned to top of bubble */}
+                    {isVuxio && (
+                      <div className="flex flex-col items-center gap-1 shrink-0">
+                        <VuxioAvatar size={36} isConnected={isConnected} isSpeaking={isSpeaking && isLast} isCodeMode={isCodeMode} />
+                      </div>
+                    )}
+
+                    {/* group wraps bubble + action bar so hover works on both */}
+                    <div className={`group max-w-[85%] flex flex-col ${log.source === 'USER' ? 'items-end' : 'items-start'}`}>
                       <span className="text-[10px] text-white/20 mb-1">{log.timestamp}</span>
 
                       {/* Message bubble */}
-                      <div className={`relative group px-4 py-3 text-sm rounded-2xl ${
+                      <div className={`px-4 py-3 text-sm rounded-2xl ${
                         log.source === 'USER'
                           ? isCodeMode
                             ? 'bg-green-600/15 border border-green-500/25 text-white font-mono'
@@ -269,33 +278,30 @@ const App: React.FC = () => {
                             : 'bg-white/5 border border-white/10 text-gray-200'
                       }`}>
                         <MarkdownMessage text={log.text} isCodeMode={isCodeMode} />
-
-                        {/* Streaming cursor */}
                         {isStreaming && isLastVuxio && (
                           <span className={`inline-block w-[2px] h-[1em] ml-0.5 align-middle ${isCodeMode ? 'bg-green-400' : 'bg-purple-400'}`}
                             style={{ animation: 'VUXIO-cursor 0.8s ease-in-out infinite' }} />
                         )}
-
-                        {/* Copy button — appears on hover */}
-                        {log.source === 'VUXIO' && log.text && (
-                          <CopyButton text={log.text} isCodeMode={isCodeMode} />
-                        )}
                       </div>
 
-                      {/* Regenerate button — only below last VUXIO message when idle */}
-                      {isLastVuxio && !isLoading && !isStreaming && (
-                        <button
-                          onClick={() => regenerate(user?.displayName || 'Utilizador')}
-                          className={`mt-1.5 flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-lg transition-all opacity-0 group-hover:opacity-100 hover:opacity-100 ${
-                            isCodeMode
-                              ? 'text-green-400/50 hover:text-green-400 hover:bg-green-500/10'
-                              : 'text-white/25 hover:text-white/60 hover:bg-white/5'
-                          }`}
-                          style={{ marginLeft: '2px' }}
-                        >
-                          <RefreshCw size={11} />
-                          Regenerar
-                        </button>
+                      {/* Action bar — below bubble, visible on hover */}
+                      {isVuxio && log.text && (
+                        <div className="flex items-center gap-1 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                          <CopyButton text={log.text} isCodeMode={isCodeMode} />
+                          {isLastVuxio && !isLoading && !isStreaming && (
+                            <button
+                              onClick={() => regenerate(user?.displayName || 'Utilizador')}
+                              className={`flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-lg transition-colors ${
+                                isCodeMode
+                                  ? 'text-green-400/50 hover:text-green-400 hover:bg-green-500/10'
+                                  : 'text-white/30 hover:text-white/70 hover:bg-white/5'
+                              }`}
+                            >
+                              <RefreshCw size={11} />
+                              Regenerar
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
