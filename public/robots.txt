@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://heliosbest.vercel.app/sitemap.xml
+Sitemap: https://vuxio.vercel.app/sitemap.xml
