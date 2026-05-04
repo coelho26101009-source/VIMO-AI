@@ -4,7 +4,11 @@
 
 export const CODE_MODEL = 'gemini-2.0-flash';
 
-export const GEMINI_API_KEY = (import.meta as any).env.VITE_GEMINI_API_KEY as string;
+export const GEMINI_API_KEY = (import.meta as any).env.VITE_GEMINI_API_KEY as string | undefined;
+
+if (!GEMINI_API_KEY) {
+  console.warn('[VUXIO] VITE_GEMINI_API_KEY não definida — Code Mode vai usar Groq como fallback.');
+}
 
 export const buildCodeSystemPrompt = (userName: string) =>
   `Tu és o VUXIO em modo PROGRAMADOR, assistente técnico de código criado pelo Simão. Utilizador: ${userName}.

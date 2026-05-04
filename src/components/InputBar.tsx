@@ -49,6 +49,11 @@ export const InputBar: React.FC<InputBarProps> = ({ onSend, isLoading, isConnect
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Ficheiro demasiado grande. Máximo: 5MB.');
+      if (fileRef.current) fileRef.current.value = '';
+      return;
+    }
     const reader = new FileReader();
     reader.onload = ev => {
       const base64 = (ev.target?.result as string).split(',')[1];

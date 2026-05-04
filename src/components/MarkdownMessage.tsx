@@ -108,6 +108,11 @@ export const MarkdownMessage: React.FC<{ text: string; isCodeMode?: boolean }> =
       h2: ({ children }) => <h2 className={`text-base font-bold mb-2 ${isCodeMode ? 'text-green-400 font-mono' : 'text-purple-300'}`}>{children}</h2>,
       h3: ({ children }) => <h3 className={`text-sm font-bold mb-1 ${isCodeMode ? 'text-green-300 font-mono' : 'text-purple-200'}`}>{children}</h3>,
       strong: ({ children }) => <strong className="font-bold text-white">{children}</strong>,
+      a: ({ href, children }) => (
+        <a href={href} target="_blank" rel="noopener noreferrer" className="text-purple-400 underline hover:text-purple-300 transition-colors">
+          {children}
+        </a>
+      ),
     }}
   >
     {text}
