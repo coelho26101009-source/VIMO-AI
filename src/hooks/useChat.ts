@@ -45,15 +45,21 @@ export const useChat = (user: User | null, onReply: (text: string) => void, code
   const subscribeToChats = useCallback((userId: string) => {
     const q = query(
       collection(db, 'chats'),
-      where('userId', '==', userId),
-      orderBy('updatedAt', 'desc')
+      where('userId', '==', userId)
     );
     return onSnapshot(q, snapshot => {
-      setChatList(snapshot.docs.map(d => ({ id: d.id, title: d.data().title })));
+      const chats = snapshot.docs.map(d => ({
+        id: d.id,
+        title: d.data().title as string,
+        updatedAt: d.data().updatedAt?.seconds ?? 0,
+      }));
+      chats.sort((a, b) => b.updatedAt - a.updatedAt);
+      setChatList(chats.map(c => ({ id: c.id, title: c.title })));
     });
   }, []);
 
   const loadChat = useCallback(async (id: string) => {
+    setLogs([]);
     setCurrentChatId(id);
     const chatDoc = await getDoc(doc(db, 'chats', id));
     if (!chatDoc.exists()) return;
@@ -68,13 +74,12 @@ export const useChat = (user: User | null, onReply: (text: string) => void, code
       const msgsSnap = await getDocs(
         query(collection(db, 'chats', id, 'messages'), orderBy('createdAt', 'asc'))
       );
-      messages = msgsSnap.docs.map(d => normalizeMessage(d.data()));
+      messages = msgsSnap.docs.map(d => normalizeMessage(d.data() as LogMessage));
       setIsLegacyChat(false);
     }
 
     setLogs(messages);
-    addLog('SYSTEM', 'Histórico carregado.');
-  }, [addLog]);
+  }, []);
 
   const newChat = useCallback(() => {
     setCurrentChatId(null);
@@ -207,6 +212,7 @@ export const useChat = (user: User | null, onReply: (text: string) => void, code
       if (!currentChatId) {
         const chatRef = await addDoc(collection(db, 'chats'), {
           userId: user.uid,
+          userEmail: user.email ?? '',
           title: text.substring(0, 35) || 'Nova Conversa',
           updatedAt: serverTimestamp(),
         });
