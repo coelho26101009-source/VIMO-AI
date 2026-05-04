@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="public/logovuxio.png" width="96" alt="VUXIO AI" />
+<img src="public/logojanelavuxio.png" width="96" alt="VUXIO AI" />
 
 # VUXIO AI
 
